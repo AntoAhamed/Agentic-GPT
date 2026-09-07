@@ -1,0 +1,14 @@
+langgraph
+langchain
+langchain-community
+langchain-core
+langchain-google-genai
+python-dotenv
+streamlit
+langgraph-checkpoint-sqlite
+tavily-python
+langchain-tavily
+pypdf
+faiss-cpu
+streamlit-mic-recorder
+pywhatkit
