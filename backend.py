@@ -287,7 +287,7 @@ def get_weather_data(city: str) -> str:
         f"key={WEATHERAPI_API_KEY}&q={city}"
     )
 
-    response = requests.get(url)
+    response = requests.get(url, timeout=10)
 
     data = response.json()
 
@@ -475,7 +475,8 @@ def send_whatsapp_message(phone_number: str, message: str) -> str:
 
 
 # Create tools list
-tools = [rag_tool, search_tool, get_weather_data, calculator, send_email, send_whatsapp_message]
+# tools = [rag_tool, search_tool, get_weather_data, calculator, send_email, send_whatsapp_message]
+tools = [rag_tool, search_tool, get_weather_data, calculator] # Removed tools to deploy to free plan on Render
 
 # Bind tools to llm
 llm_with_tools = llm.bind_tools(tools)
