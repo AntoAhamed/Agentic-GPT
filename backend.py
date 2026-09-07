@@ -18,9 +18,11 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langgraph.types import interrupt, Command
-import smtplib
-from email.message import EmailMessage
-import pywhatkit
+
+# Removed imports for free deployment on Render
+# import smtplib
+# from email.message import EmailMessage
+# import pywhatkit
 
 
 # Load environment
@@ -345,133 +347,136 @@ def calculator(expression: str) -> str:
     except Exception as e:
         return f"Calculation error: {str(e)}"
 
+
+
+# Email and WhatsApp tools are removed to deploy on Render for free
 # Email tool
-@tool
-def send_email(
-    recipient: str,
-    subject: str,
-    body: str
-) -> str:
-    """
-    Send an email to a recipient.
+# @tool
+# def send_email(
+#     recipient: str,
+#     subject: str,
+#     body: str
+# ) -> str:
+#     """
+#     Send an email to a recipient.
 
-    Use this tool when the user explicitly asks to send
-    an email.
+#     Use this tool when the user explicitly asks to send
+#     an email.
 
-    Args:
-        recipient: Email address of the recipient.
-        subject: Subject of the email.
-        body: Complete email body.
-    """
+#     Args:
+#         recipient: Email address of the recipient.
+#         subject: Subject of the email.
+#         body: Complete email body.
+#     """
 
 
 
-    # HITL
-    decision = interrupt(f"Do you want to send {body} to {recipient}? (yes/no)")
+#     # HITL
+#     decision = interrupt(f"Do you want to send {body} to {recipient}? (yes/no)")
 
-    if isinstance(decision, str) and decision.lower().strip() != "yes":
+#     if isinstance(decision, str) and decision.lower().strip() != "yes":
 
-        return "Email sending aborted by the user."
+#         return "Email sending aborted by the user."
 
     
 
-    sender_email = os.environ.get(
-        "EMAIL_ADDRESS"
-    )
+#     sender_email = os.environ.get(
+#         "EMAIL_ADDRESS"
+#     )
 
-    app_password = os.environ.get(
-        "EMAIL_APP_PASSWORD"
-    )
+#     app_password = os.environ.get(
+#         "EMAIL_APP_PASSWORD"
+#     )
 
-    if not sender_email or not app_password:
+#     if not sender_email or not app_password:
 
-        return (
-            "Email configuration is missing. "
-            "Please configure EMAIL_ADDRESS and "
-            "EMAIL_APP_PASSWORD in the .env file."
-        )
-
-
-    try:
-
-        # -----------------------------------------
-        # Create email
-        # -----------------------------------------
-
-        message = EmailMessage()
-
-        message["From"] = sender_email
-        message["To"] = recipient
-        message["Subject"] = subject
-
-        message.set_content(
-            body
-        )
+#         return (
+#             "Email configuration is missing. "
+#             "Please configure EMAIL_ADDRESS and "
+#             "EMAIL_APP_PASSWORD in the .env file."
+#         )
 
 
-        # -----------------------------------------
-        # Connect to Gmail SMTP
-        # -----------------------------------------
+#     try:
 
-        with smtplib.SMTP(
-            "smtp.gmail.com",
-            587
-        ) as server:
+#         # -----------------------------------------
+#         # Create email
+#         # -----------------------------------------
 
-            server.starttls()
+#         message = EmailMessage()
 
-            server.login(
-                sender_email,
-                app_password
-            )
+#         message["From"] = sender_email
+#         message["To"] = recipient
+#         message["Subject"] = subject
 
-            server.send_message(
-                message
-            )
+#         message.set_content(
+#             body
+#         )
 
 
-        return (
-            f"Email successfully sent to {recipient}."
-        )
+#         # -----------------------------------------
+#         # Connect to Gmail SMTP
+#         # -----------------------------------------
+
+#         with smtplib.SMTP(
+#             "smtp.gmail.com",
+#             587
+#         ) as server:
+
+#             server.starttls()
+
+#             server.login(
+#                 sender_email,
+#                 app_password
+#             )
+
+#             server.send_message(
+#                 message
+#             )
 
 
-    except Exception as e:
+#         return (
+#             f"Email successfully sent to {recipient}."
+#         )
 
-        return (
-            f"Failed to send email: {str(e)}"
-        )
+
+#     except Exception as e:
+
+#         return (
+#             f"Failed to send email: {str(e)}"
+#         )
 
 # WhatsApp tool
-@tool
-def send_whatsapp_message(phone_number: str, message: str) -> str:
-    """
-    Send a WhatsApp message to a phone number.
-    Use this tool when the user explicitly asks to send a WhatsApp message.
-    """
+# @tool
+# def send_whatsapp_message(phone_number: str, message: str) -> str:
+#     """
+#     Send a WhatsApp message to a phone number.
+#     Use this tool when the user explicitly asks to send a WhatsApp message.
+#     """
 
 
 
-    # HITL
-    decision = interrupt(f"Do you want to send {message} to {phone_number}? (yes/no)")
+#     # HITL
+#     decision = interrupt(f"Do you want to send {message} to {phone_number}? (yes/no)")
     
-    if isinstance(decision, str) and decision.lower().strip() != "yes":
+#     if isinstance(decision, str) and decision.lower().strip() != "yes":
     
-        return "WhatsApp message sending aborted by the user."
+#         return "WhatsApp message sending aborted by the user."
     
 
 
-    try:
-        pywhatkit.sendwhatmsg_instantly(
-            phone_number,
-            message,
-            wait_time=10,
-            tab_close=True
-        )
+#     try:
+#         pywhatkit.sendwhatmsg_instantly(
+#             phone_number,
+#             message,
+#             wait_time=10,
+#             tab_close=True
+#         )
 
-        return f"WhatsApp message sent successfully to {phone_number}."
+#         return f"WhatsApp message sent successfully to {phone_number}."
 
-    except Exception as e:
-        return f"Failed to send WhatsApp message: {str(e)}"
+#     except Exception as e:
+#         return f"Failed to send WhatsApp message: {str(e)}"
 
 
 # Create tools list
