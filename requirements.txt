@@ -12,3 +12,4 @@ pypdf
 faiss-cpu
 streamlit-mic-recorder
 pywhatkit
+streamlit-cookies-manager-v2
