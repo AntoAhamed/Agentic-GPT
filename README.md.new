@@ -31,17 +31,17 @@ AgenticGPT is a Streamlit-based AI assistant that combines LangGraph, Google Gem
 
 ```text
 AgenticGPT/
-+-- app.py                 # Streamlit UI, authentication flow, and chat interface
-+-- backend.py            # Older unauthenticated backend variant
-+-- backend_with_auth.py   # Active backend with auth, tools, RAG, and graph logic
-+-- requirements.txt      # Python dependencies
-+-- .env                  # Local environment variables (not committed)
-+-- agenticgpt.db         # SQLite database for auth/session/thread metadata
-+-- faiss_db/             # Per-thread FAISS vector stores
-+-- uploaded_pdfs/        # Uploaded PDF files organized by thread
-+-- LICENSE               # Project license
-+-- README.md             # Project documentation
-+-- .venv/                # Optional local virtual environment
+├── app.py                 # Streamlit UI, authentication flow, and chat interface
+├── backend.py            # Older unauthenticated backend variant
+├── backend_with_auth.py   # Active backend with auth, tools, RAG, and graph logic
+├── requirements.txt      # Python dependencies
+├── .env                  # Local environment variables (not committed)
+├── agenticgpt.db         # SQLite database for auth/session/thread metadata
+├── faiss_db/             # Per-thread FAISS vector stores
+├── uploaded_pdfs/        # Uploaded PDF files organized by thread
+├── LICENSE               # Project license
+├── README.md             # Project documentation
+└── .venv/                # Optional local virtual environment
 ```
 
 ## How It Works
