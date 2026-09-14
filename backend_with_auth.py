@@ -24,6 +24,8 @@ from langgraph.types import interrupt, Command
 import hashlib
 import secrets
 import uuid
+import re
+import shutil
 
 # Removed imports for free deployment on Render
 # import smtplib
@@ -146,33 +148,88 @@ def verify_password(password: str, stored_hash: str) -> bool:
 
 
 # ============================================================
+# EMAIL VALIDATION
+# ============================================================
+
+EMAIL_REGEX = re.compile(
+    r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"
+    r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$"
+)
+
+
+def is_valid_email(email: str) -> bool:
+    """
+    Validate basic email syntax.
+
+    This checks that the email:
+    - contains a valid local part
+    - contains @
+    - contains a domain
+    - contains at least one domain extension
+    """
+    if not email:
+        return False
+
+    email = email.strip()
+
+    # RFC practical maximum length.
+    if len(email) > 254:
+        return False
+
+    if not EMAIL_REGEX.fullmatch(email):
+        return False
+
+    return True
+
+
+# ============================================================
 # SIGNUP
 # ============================================================
 
-def signup(username: str, email: str, password: str):
-
+def signup(username, email, password):
     username = username.strip()
     email = email.strip().lower()
+    password = password or ""
+
+    # --------------------------------------------------------
+    # BASIC VALIDATION
+    # --------------------------------------------------------
 
     if not username:
         return False, "Username is required."
 
-    if not email:
-        return False, "Email is required."
+    if len(username) < 3:
+        return False, "Username must be at least 3 characters."
 
-    if not password:
-        return False, "Password is required."
+    if len(username) > 50:
+        return False, "Username must be 50 characters or fewer."
+
+    # --------------------------------------------------------
+    # EMAIL VALIDATION
+    # --------------------------------------------------------
+
+    if not is_valid_email(email):
+        return False, "Please enter a valid email address."
+
+    # --------------------------------------------------------
+    # PASSWORD VALIDATION
+    # --------------------------------------------------------
 
     if len(password) < 8:
-        return False, "Password must contain at least 8 characters."
+        return False, "Password must be at least 8 characters."
 
-    password_hash = hash_password(password)
+    # --------------------------------------------------------
+    # CREATE USER
+    # --------------------------------------------------------
 
     try:
+        password_hash = hash_password(password)
 
         user_id = str(uuid.uuid4())
 
-        conn.execute(
+        cursor = conn.cursor()
+
+        cursor.execute(
             """
             INSERT INTO users (
                 id,
@@ -186,17 +243,14 @@ def signup(username: str, email: str, password: str):
                 user_id,
                 username,
                 email,
-                password_hash
-            )
+                password_hash,
+            ),
         )
 
-        # ----------------------------------------------------
-        # CREATE PERSISTENT SESSION
-        # ----------------------------------------------------
-
+        # Create persistent session.
         session_token = secrets.token_urlsafe(32)
 
-        conn.execute(
+        cursor.execute(
             """
             INSERT INTO sessions (
                 token,
@@ -206,8 +260,8 @@ def signup(username: str, email: str, password: str):
             """,
             (
                 session_token,
-                user_id
-            )
+                user_id,
+            ),
         )
 
         conn.commit()
@@ -216,18 +270,28 @@ def signup(username: str, email: str, password: str):
             "id": user_id,
             "username": username,
             "email": email,
-            "session_token": session_token
+            "session_token": session_token,
         }
 
     except sqlite3.IntegrityError as e:
 
-        if "username" in str(e).lower():
-            return False, "Username already exists."
+        conn.rollback()
 
-        if "email" in str(e).lower():
-            return False, "Email already exists."
+        error_message = str(e).lower()
 
-        return False, "Could not create account."
+        if "email" in error_message:
+            return False, "An account with this email already exists."
+
+        if "username" in error_message:
+            return False, "That username is already taken."
+
+        return False, "Unable to create account."
+
+    except Exception as e:
+
+        conn.rollback()
+
+        return False, "Unable to create account."
 
 
 # ============================================================
@@ -402,6 +466,133 @@ def thread_belongs_to_user(
     )
 
     return cursor.fetchone() is not None
+
+
+# ============================================================
+# DELETE CONVERSATION
+# ============================================================
+
+def delete_conversation(user_id: str, thread_id: str):
+    """
+    Permanently delete a conversation belonging to a user.
+
+    Deletes:
+        1. LangGraph checkpoints
+        2. thread_owners record
+        3. uploaded PDFs
+        4. FAISS index
+
+    Security:
+        The conversation MUST belong to the authenticated user.
+    """
+
+    if not user_id:
+        raise PermissionError(
+            "User authentication is invalid."
+        )
+
+    if not thread_id:
+        raise ValueError(
+            "Thread ID is required."
+        )
+
+    # --------------------------------------------------------
+    # SECURITY CHECK
+    # --------------------------------------------------------
+
+    if not thread_belongs_to_user(
+        thread_id,
+        user_id,
+    ):
+        raise PermissionError(
+            "You do not have permission to delete this conversation."
+        )
+
+    # --------------------------------------------------------
+    # DELETE LANGGRAPH CHECKPOINTS
+    # --------------------------------------------------------
+
+    try:
+
+        checkpoint.delete_thread(
+            thread_id
+        )
+
+    except Exception as e:
+
+        raise RuntimeError(
+            f"Unable to delete conversation: {str(e)}"
+        )
+
+    # --------------------------------------------------------
+    # DELETE THREAD OWNERSHIP
+    # --------------------------------------------------------
+
+    try:
+
+        cursor = conn.execute(
+            """
+            DELETE FROM thread_owners
+            WHERE thread_id = ?
+            AND user_id = ?
+            """,
+            (
+                thread_id,
+                user_id,
+            )
+        )
+
+        conn.commit()
+
+    except Exception as e:
+
+        conn.rollback()
+
+        raise RuntimeError(
+            f"Unable to delete conversation ownership: {str(e)}"
+        )
+
+    # --------------------------------------------------------
+    # DELETE UPLOADED PDF DIRECTORY
+    # --------------------------------------------------------
+
+    pdf_directory = os.path.join(
+        "uploaded_pdfs",
+        thread_id
+    )
+
+    if os.path.isdir(pdf_directory):
+
+        try:
+
+            shutil.rmtree(
+                pdf_directory
+            )
+
+        except Exception:
+            pass
+
+    # --------------------------------------------------------
+    # DELETE FAISS DIRECTORY
+    # --------------------------------------------------------
+
+    faiss_directory = os.path.join(
+        "faiss_db",
+        thread_id
+    )
+
+    if os.path.isdir(faiss_directory):
+
+        try:
+
+            shutil.rmtree(
+                faiss_directory
+            )
+
+        except Exception:
+            pass
+
+    return True
 
 
 # ============================================================

@@ -14,6 +14,7 @@ from backend_with_auth import (
     thread_belongs_to_user,
     get_user_from_session,
     delete_session,
+    delete_conversation,
 )
 
 from langchain_core.messages import HumanMessage, AIMessage
@@ -246,6 +247,43 @@ st.markdown(
 
     .logout-button button {
         color: #ff7b72 !important;
+    }
+
+    /* ========================================================
+       SIDEBAR CONVERSATION DELETE
+       ======================================================== */
+
+    .delete-thread-button button {
+        width: 100% !important;
+        min-height: 38px !important;
+        padding: 0 !important;
+        margin: 0 0 7px 0 !important;
+        border-radius: 8px !important;
+        border: 1px solid #3a3a3a !important;
+        background: transparent !important;
+        color: #8e8e8e !important;
+        text-align: center !important;
+    }
+
+    .delete-thread-button button:hover {
+        background: #3a2020 !important;
+        border-color: #6b3838 !important;
+        color: #ff7b72 !important;
+    }
+
+    .delete-confirmation {
+        background: #242424;
+        border: 1px solid #3a3a3a;
+        border-radius: 10px;
+        padding: 10px;
+        margin: -2px 0 9px 0;
+    }
+
+    .delete-confirmation-text {
+        color: #d0d0d0;
+        font-size: 12px;
+        line-height: 1.4;
+        margin-bottom: 8px;
     }
 
 
@@ -609,6 +647,9 @@ if "initialized" not in st.session_state:
 
 if "new_chat_mode" not in st.session_state:
     st.session_state.new_chat_mode = False
+
+if "delete_confirm_thread" not in st.session_state:
+    st.session_state.delete_confirm_thread = None
 
 
 # ============================================================
@@ -1118,6 +1159,43 @@ def switch_thread(thread_id):
 
     st.session_state.new_chat_mode = False
 
+    st.rerun()
+
+
+def delete_thread_from_ui(thread_id):
+    """Permanently delete a conversation for the authenticated user."""
+
+    user_id = st.session_state.user_id
+
+    if not user_id:
+        st.error("Authentication is invalid.")
+        return
+
+    if not thread_id:
+        return
+
+    try:
+        deleted = delete_conversation(user_id, thread_id)
+
+        if not deleted:
+            st.error("Conversation could not be deleted.")
+            return
+
+    except PermissionError as e:
+        st.error(str(e))
+        return
+    except Exception as e:
+        st.error(f"Unable to delete conversation: {str(e)}")
+        return
+
+    st.session_state.chat_threads.pop(thread_id, None)
+
+    if st.session_state.thread_id == thread_id:
+        st.session_state.thread_id = None
+        st.session_state.messages = []
+        st.session_state.new_chat_mode = True
+
+    st.session_state.delete_confirm_thread = None
     st.rerun()
 
 
@@ -1645,26 +1723,74 @@ with st.sidebar:
             )
 
             if is_current:
-
-                button_label = (
-                    f"●  {title}"
-                )
-
+                button_label = f"●  {title}"
             else:
+                button_label = f"   {title}"
 
-                button_label = (
-                    f"   {title}"
+            col_chat, col_delete = st.columns(
+                [5.5, 1],
+                gap="small",
+            )
+
+            with col_chat:
+                if st.button(
+                    button_label,
+                    key=f"thread_{thread_id}",
+                    use_container_width=True,
+                ):
+                    switch_thread(thread_id)
+
+            with col_delete:
+                st.markdown(
+                    '<div class="delete-thread-button">',
+                    unsafe_allow_html=True,
                 )
 
-            if st.button(
-                button_label,
-                key=f"thread_{thread_id}",
-                use_container_width=True,
-            ):
+                if st.button(
+                    "🗑",
+                    key=f"delete_{thread_id}",
+                    help="Delete conversation",
+                    use_container_width=True,
+                ):
+                    st.session_state.delete_confirm_thread = thread_id
+                    st.rerun()
 
-                switch_thread(
-                    thread_id
+                st.markdown(
+                    "</div>",
+                    unsafe_allow_html=True,
                 )
+
+            if st.session_state.delete_confirm_thread == thread_id:
+
+                st.markdown(
+                    '<div class="delete-confirmation">'
+                    '<div class="delete-confirmation-text">'
+                    'Delete this conversation permanently?'
+                    '</div></div>',
+                    unsafe_allow_html=True,
+                )
+
+                confirm_col, cancel_col = st.columns(
+                    2,
+                    gap="small",
+                )
+
+                with confirm_col:
+                    if st.button(
+                        "Delete",
+                        key=f"confirm_delete_{thread_id}",
+                        use_container_width=True,
+                    ):
+                        delete_thread_from_ui(thread_id)
+
+                with cancel_col:
+                    if st.button(
+                        "Cancel",
+                        key=f"cancel_delete_{thread_id}",
+                        use_container_width=True,
+                    ):
+                        st.session_state.delete_confirm_thread = None
+                        st.rerun()
 
     else:
 
